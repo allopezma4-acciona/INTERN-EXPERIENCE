@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comunidad ACCIONA</title>
+<style>
+:root{--bg:#0b1f1a;--fg:#f4f7f5;--ac:#5be08f;--cover:#12352c}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center}
+.card{width:min(92vw,420px);text-align:center;padding:24px}
+h1{font-size:1.5rem;margin:0 0 8px}p{opacity:.8;margin:0 0 20px}
+input{width:100%;font-size:2rem;letter-spacing:.3em;text-align:center;text-transform:uppercase;padding:14px;border-radius:12px;border:2px solid #2c5c4d;background:#0f2a23;color:var(--fg)}
+input:focus{outline:none;border-color:var(--ac)}
+button{margin-top:14px;width:100%;font-size:1.1rem;padding:14px;border:0;border-radius:12px;background:var(--ac);color:#06281a;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5}
+#msg{margin-top:16px;min-height:1.5em}
+.err{color:#ff9b9b}.ok{color:var(--ac)}
+/* Panel */
+#panel{display:none;width:100vw;height:100vh;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px}
+#stage{position:relative;aspect-ratio:3/2;width:min(96vw,calc((100vh - 70px)*1.5));border-radius:10px;overflow:hidden;background:#000}
+#stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#grid{position:absolute;inset:0;display:grid}
+.t{background:var(--cover);border:1px solid rgba(255,255,255,.06);transition:opacity 1.2s ease}
+.t.r{opacity:0}
+#phrase{position:absolute;left:0;right:0;bottom:0;padding:5% 6% 3%;font-size:clamp(1.2rem,3.6vw,3rem);font-weight:800;text-align:center;
+ background:linear-gradient(transparent,rgba(0,0,0,.72));opacity:0;transition:opacity 1.6s ease .8s}
+#phrase.on{opacity:1}
+#bar{display:flex;gap:16px;align-items:center;font-size:1.1rem}
+#bar button{width:auto;margin:0;padding:8px 16px;font-size:.95rem}
+</style>
+</head>
+<body>
+<div class="card" id="entry">
+  <h1>Comunidad ACCIONA</h1>
+  <p>Escribe tu código único para descubrir tu pieza</p>
+  <input id="code" maxlength="8" autocomplete="off" autocapitalize="characters" placeholder="······">
+  <button id="go">Enviar</button>
+  <div id="msg"></div>
+</div>
+<div id="panel">
+  <div id="stage"><img src="imagen.jpg" alt="">
+    <div id="grid"></div>
+    <div id="phrase">Todos juntos creamos la comunidad ACCIONA</div>
+  </div>
+  <div id="bar"><span id="count"></span><button id="all" style="display:none">Revelar el resto</button></div>
+</div>
+<script>
+// ====== CONFIGURACIÓN ======
+const SCRIPT_URL = "PEGA_AQUI_LA_URL_DE_APPS_SCRIPT"; // termina en /exec
+const COLS = 8, ROWS = 5;                             // COLS*ROWS debe coincidir con TILES en Code.gs
+// ===========================
+const $ = id => document.getElementById(id);
+const api = (params) => fetch(SCRIPT_URL + "?" + new URLSearchParams(params)).then(r => r.json());
+const qs = new URLSearchParams(location.search);
+
+if (qs.has("panel")) {
+  $("entry").style.display = "none"; $("panel").style.display = "flex";
+  const g = $("grid"); g.style.gridTemplateColumns = `repeat(${COLS},1fr)`; g.style.gridTemplateRows = `repeat(${ROWS},1fr)`;
+  for (let i = 0; i < COLS * ROWS; i++) { const d = document.createElement("div"); d.className = "t"; g.appendChild(d); }
+  const key = qs.get("panel");
+  if (key) { $("all").style.display = ""; $("all").onclick = async () => {
+    if (!confirm("¿Revelar todas las piezas pendientes?")) return;
+    const r = await api({ a: "reveal", key }); if (!r.ok) alert("Clave incorrecta"); else poll(); }; }
+  async function poll() {
+    try {
+      const s = await api({ a: "state" });
+      const tiles = g.children;
+      for (let i = 0; i < tiles.length; i++) tiles[i].classList.toggle("r", s.all || s.tiles.includes(i));
+      $("count").textContent = `${s.used} participantes`;
+      $("phrase").classList.toggle("on", s.all || s.tiles.length >= tiles.length);
+    } catch (e) {}
+  }
+  poll(); setInterval(poll, 3000);
+} else {
+  const send = async () => {
+    const code = $("code").value.trim(); if (!code) return;
+    $("go").disabled = true; $("msg").textContent = "Comprobando…"; $("msg").className = "";
+    try {
+      const r = await api({ a: "submit", code });
+      if (r.ok) { $("msg").className = "ok"; $("msg").textContent = r.repeat ? "Este código ya estaba registrado. ¡Gracias!" : "¡Listo! Mira el panel: tu pieza acaba de aparecer."; $("code").value = ""; }
+      else { $("msg").className = "err"; $("msg").textContent = "Código no válido. Revisa que esté bien escrito."; }
+    } catch (e) { $("msg").className = "err"; $("msg").textContent = "No se pudo conectar. Inténtalo de nuevo."; }
+    $("go").disabled = false;
+  };
+  $("go").onclick = send; $("code").addEventListener("keydown", e => e.key === "Enter" && send());
+}
+</script>
+</body>
+</html>
